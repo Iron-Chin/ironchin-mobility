@@ -1,0 +1,654 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+
+  <!-- iOS install / fullscreen meta -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Iron Chin" />
+  <meta name="theme-color" content="#15171C" />
+
+  <title>Iron Chin Mobility</title>
+
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png" />
+
+  <style>
+    html, body { margin: 0; padding: 0; background: #15171C; }
+    #root { min-height: 100vh; }
+  </style>
+
+  <!-- React + Babel via CDN — no build step -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef } = React;
+
+/* ════════════════════════════════════════════════════════════════════════
+   PINNED DEMO VIDEOS — EDIT HERE
+   One vetted clip per exercise, keyed by the exercise name exactly as it
+   appears in TYPES below. To swap a clip, just paste a new YouTube URL.
+   ════════════════════════════════════════════════════════════════════════ */
+const VIDEOS = {
+  // Day A — Hips
+  "Hip CARs":                  "https://www.youtube.com/watch?v=hRMrq6G81p8", // Cleveland Clinic
+  "90/90 switches":            "https://www.youtube.com/watch?v=qq_Z7sAmVrA", // 90/90 Hip Switch
+  "Cossack squat":             "https://www.youtube.com/watch?v=p_scPPvWD2I", // Tom Morrison
+  "Couch stretch":             "https://www.youtube.com/watch?v=WKo4APrwfXQ", // Couch Stretch Progressions
+
+  // Day B — T-spine + shoulders
+  "Cat–cow":                   "https://www.youtube.com/watch?v=xyNwxiuERXc", // Cat–Cow proper form
+  "Open book":                 "https://www.youtube.com/watch?v=rDviWORCWEw", // Open Books (sidelying)
+  "Thread the needle":         "https://www.youtube.com/watch?v=4qLJhgvK71M", // Thread the Needle (physio)
+  "Band pass-throughs":        "https://www.youtube.com/watch?v=nikVq2pMVg4", // Tom Morrison
+
+  // Day C — Hips + ankles
+  "Ankle CARs + leg swings":   "https://www.youtube.com/watch?v=8iOS3_R_IEg", // Ankle CARs full mobility
+  "Knee-to-wall":              "https://www.youtube.com/watch?v=NqgwyM9hXMI", // Knee-to-Wall ankle
+  "Frog rock-backs":           "https://www.youtube.com/watch?v=VBMhdjfG-7M", // Frog Mobility
+  "Band straight-leg raise":   "https://www.youtube.com/watch?v=Il1L75v6gq0", // Ask Doctor Jo
+
+  // Day D — Posterior + flow
+  "World's greatest stretch":  "https://www.youtube.com/watch?v=-CiWQ2IvY34", // Squat University
+  "Down-dog ↔ cobra flow":     "https://www.youtube.com/watch?v=zV-dAVrnZFY", // Down Dog to Cobra
+  "Toe-touch reset":           "https://www.youtube.com/watch?v=akNfD15Y8wU", // Functional Movement Systems
+  "Standing fold (PNF)":       "https://www.youtube.com/watch?v=5Wi5d2T7JK0", // Hamstring PNF Contract-Relax
+};
+/* ════════════════════════════════════════════════════════════════════════ */
+
+/* ───────────────────────── icons (inline SVG, lucide paths) ─────────────── */
+const makeIcon = (children) => ({ size = 24, color = "currentColor", fill = "none", style, ...rest }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24"
+    fill={fill} stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+    style={style} {...rest}>{children}</svg>
+);
+const Flame = makeIcon(<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />);
+const Play = makeIcon(<polygon points="6 3 20 12 6 21 6 3" />);
+const Pause = makeIcon(<><rect x="14" y="4" width="4" height="16" rx="1" /><rect x="6" y="4" width="4" height="16" rx="1" /></>);
+const RotateCcw = makeIcon(<><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></>);
+const Check = makeIcon(<path d="M20 6 9 17l-5-5" />);
+const ChevronLeft = makeIcon(<path d="m15 18-6-6 6-6" />);
+const ChevronRight = makeIcon(<path d="m9 18 6-6-6-6" />);
+const Target = makeIcon(<><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></>);
+const Grid3x3 = makeIcon(<><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M3 9h18" /><path d="M3 15h18" /><path d="M9 3v18" /><path d="M15 3v18" /></>);
+const ClipboardCheck = makeIcon(<><rect width="8" height="4" x="8" y="2" rx="1" ry="1" /><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><path d="m9 14 2 2 4-4" /></>);
+const BookOpen = makeIcon(<><path d="M12 7v14" /><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></>);
+const X = makeIcon(<><path d="M18 6 6 18" /><path d="m6 6 12 12" /></>);
+const ExternalLink = makeIcon(<><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></>);
+const Circle = makeIcon(<circle cx="12" cy="12" r="10" />);
+const Mic = makeIcon(<><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" x2="12" y1="19" y2="22" /></>);
+
+/* ───────────────────────── palette (inline; no Tailwind arbitrary values) ── */
+const C = {
+  bg0: "#15171C", bg1: "#1D2027", bg2: "#262A33", line: "#333845",
+  ink: "#ECEAE4", ink2: "#9AA0AC",
+  amber: "#E8772E", blue: "#5B8DB8", teal: "#36A18B", violet: "#9B7EDE", slate: "#7C8595",
+};
+
+/* ───────────────────────── data ──────────────────────────────────────────── */
+const FOCUS = {
+  A: { label: "Hips", sub: "kicks · teep · checks · stance", color: C.amber },
+  B: { label: "T-spine + shoulders", sub: "punch rotation · guard · clinch", color: C.blue },
+  C: { label: "Hips + ankles", sub: "pivot · balance · kick mechanics", color: C.teal },
+  D: { label: "Posterior + flow", sub: "hamstrings · toe-touch · stitch it together", color: C.violet },
+};
+
+const TYPES = {
+  A: [
+    { n: "Hip CARs", d: "3 slow circles each way · each hip", c: "Biggest circle you can control. Move from the hip socket — keep ribs down and spine still.", tag: "WARM-UP" },
+    { n: "90/90 switches", d: "8–10 switches · then 20–30s hold/side", c: "Sit tall, both knees at 90°. Rotate toward your back hip. If your low back rounds, sit up on the block.", tag: "PRIORITY" },
+    { n: "Cossack squat", d: "5 each side", c: "Heel down, chest up, sink into one hip; far leg straight with toes up. Only as deep as you can own." },
+    { n: "Couch stretch", d: "30–45s each side", c: "Back shin up the wall or block. Squeeze the back glute and tuck the pelvis under — that's the stretch, not arching your back." },
+  ],
+  B: [
+    { n: "Cat–cow", d: "8 slow rounds", c: "Move one vertebra at a time, synced to your breath.", tag: "WARM-UP" },
+    { n: "Open book", d: "6–8 each side · 2–3s hold", c: "Knees stacked and pinned down. Follow your top hand with your eyes. Exhale as you open." },
+    { n: "Thread the needle", d: "6 each side", c: "Reach the arm under and through, then unwind and open it toward the ceiling." },
+    { n: "Band pass-throughs", d: "8–10 reps", c: "Straight arms, wide grip, slow. Stop short of any pinch. Narrow the grip over the weeks." },
+  ],
+  C: [
+    { n: "Ankle CARs + leg swings", d: "5 each", c: "Trace slow ankle circles, then relaxed leg swings front-to-back and side-to-side.", tag: "WARM-UP" },
+    { n: "Knee-to-wall", d: "8–10 each · note the cm", c: "Foot a few cm from wall, drive the knee over your toes to tap the wall, heel glued down. Track your distance." },
+    { n: "Frog rock-backs", d: "8–10 · then 20–30s hold", c: "Knees wide, ankles in line with knees, flat back. Rock your hips back toward your heels." },
+    { n: "Band straight-leg raise", d: "8–10 each · then 5s push/relax ×3", c: "Band round your foot, leg fairly straight, raise to a stretch — never pain. This is your toe-touch unlock.", tag: "TOE-TOUCH" },
+  ],
+  D: [
+    { n: "World's greatest stretch", d: "4–5 each side", c: "Lunge, opposite elbow to instep, then rotate that arm to the sky. Hip, hamstring and t-spine in one move.", tag: "OPENER" },
+    { n: "Down-dog ↔ cobra flow", d: "6–8 slow", c: "Push hips up and drive heels down for the calves and hamstrings; then glide forward and open the chest." },
+    { n: "Toe-touch reset", d: "2 rounds", c: "Heels on block, hinge and reach down (5 breaths). Then toes on block, hinge and reach. Resets how your spine and hips share the bend.", tag: "TOE-TOUCH" },
+    { n: "Standing fold (PNF)", d: "30s · then contract-relax", c: "Soft knees, hinge from the hips, let your head hang heavy. To progress: press feet into the floor 5s, relax, fold a touch deeper.", tag: "TOE-TOUCH" },
+  ],
+};
+
+// 30 sessions, 5-cycle [A,B,C,A,D] → hips prioritised (12 of 30)
+const SCHEDULE = Array.from({ length: 30 }, (_, i) => ["A", "B", "C", "A", "D"][i % 5]);
+
+const PHASES = [
+  { name: "Prime", range: [1, 8], color: C.slate, note: "Learn the shapes. Short holds (~20s), slow reps. Don't chase range yet — build the habit." },
+  { name: "Lengthen", range: [9, 15], color: C.teal, note: "Longer end-range holds (30–45s). Add PNF: push into the stretch 5s, relax, sink deeper. Repeat ×2–3." },
+  { name: "Load", range: [16, 23], color: C.amber, note: "Own the range. Add band tension at end-range + CARs. This is what turns range into usable kicking strength." },
+  { name: "Flow", range: [24, 30], color: C.violet, note: "Stitch it together — smooth transitions. Session 30: retest against your day-1 numbers." },
+];
+const phaseOf = (s) => PHASES.find((p) => s >= p.range[0] && s <= p.range[1]);
+
+const STORE_KEY = "ironchin-mobility:v1";
+
+/* ───────────────────────── persistence (localStorage) ───────────────────── */
+function loadState() {
+  try { const r = localStorage.getItem(STORE_KEY); return r ? JSON.parse(r) : null; }
+  catch { return null; }
+}
+function saveState(s) {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(s)); } catch { /* runs without persistence */ }
+}
+
+/* ───────────────────────── hold timer ───────────────────────────────────── */
+function Timer({ accent }) {
+  const presets = [20, 30, 45];
+  const [target, setTarget] = useState(30);
+  const [left, setLeft] = useState(30);
+  const [run, setRun] = useState(false);
+  const ref = useRef(null);
+  // ── countdown beeps (Web Audio) — last 4s tick, plus a final tone at 0 ──
+  const audioRef = useRef(null);
+  const ensureAudio = () => {                       // must run from a tap so iOS unlocks sound
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!audioRef.current && AC) audioRef.current = new AC();
+      if (audioRef.current && audioRef.current.state === "suspended") audioRef.current.resume();
+    } catch { /* no audio available */ }
+  };
+  const beep = (freq, dur) => {
+    try {
+      const ctx = audioRef.current; if (!ctx) return;
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = "sine"; o.frequency.value = freq;
+      o.connect(g); g.connect(ctx.destination);
+      const t = ctx.currentTime;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.3, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.start(t); o.stop(t + dur + 0.02);
+    } catch { /* ignore */ }
+  };
+  useEffect(() => {
+    if (!run) return;
+    ref.current = setInterval(() => setLeft((l) => {
+      const next = l - 1;
+      if (next <= 0) { clearInterval(ref.current); setRun(false); beep(880, 0.4); return 0; } // final tone
+      if (next <= 4) beep(660, 0.12);                                                          // 4·3·2·1 ticks
+      return next;
+    }), 1000);
+    return () => clearInterval(ref.current);
+  }, [run]);
+  // ── 4-second lead-in ("get into position") before the hold begins ───────
+  const [prep, setPrep] = useState(null);   // null = no lead-in; else 4·3·2·1 countdown
+  const [focus, setFocus] = useState(false); // full-screen focus mode (stays up while paused)
+  const prepRef = useRef(null);
+  const targetRef = useRef(target);
+  const runRef = useRef(run);
+  useEffect(() => { targetRef.current = target; }, [target]);
+  useEffect(() => { runRef.current = run; }, [run]);
+  const cancelPrep = () => { if (prepRef.current) { clearInterval(prepRef.current); prepRef.current = null; } setPrep(null); };
+  const beginPrep = () => {
+    if (runRef.current || prepRef.current) return;
+    ensureAudio();
+    setFocus(true);
+    setLeft((l) => (l <= 0 ? targetRef.current : l));
+    setPrep(4); beep(660, 0.12);                       // first "get ready" tick
+    prepRef.current = setInterval(() => setPrep((p) => {
+      if (p <= 1) { clearInterval(prepRef.current); prepRef.current = null; beep(880, 0.25); setRun(true); return null; } // GO → hold starts
+      beep(660, 0.12); return p - 1;                   // 3 · 2 · 1 ticks
+    }), 1000);
+  };
+  const onStop = () => { cancelPrep(); setRun(false); setFocus(false); setLeft(target); };   // exit focus mode
+  const onHoldTap = () => { ensureAudio(); if (run) { setRun(false); return; } if (prep !== null) { onStop(); return; } beginPrep(); };
+
+  const set = (t) => { cancelPrep(); setTarget(t); setLeft(t); setRun(false); };
+  const reset = () => { cancelPrep(); setLeft(target); setRun(false); };
+
+  // ── best-effort voice control (Web Speech API) ──────────────────────────
+  // Reliable on desktop Chrome / Android; iOS Safari support is flaky, so this
+  // fails silently and never blocks the manual buttons. Say "go" to start.
+  const SR = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
+  const [listening, setListening] = useState(false);
+  const recRef = useRef(null);
+  const wantRef = useRef(false);      // do we intend to keep listening?
+  const toggleVoice = () => {
+    if (!SR) return;
+    ensureAudio();
+    if (listening) { wantRef.current = false; try { recRef.current && recRef.current.stop(); } catch {} setListening(false); return; }
+    try {
+      const rec = new SR();
+      rec.lang = "en-US"; rec.continuous = true; rec.interimResults = true;
+      rec.onresult = (ev) => {
+        for (let i = ev.resultIndex; i < ev.results.length; i++) {
+          const t = ev.results[i][0].transcript.toLowerCase();
+          if (/\b(go|start|hold|begin)\b/.test(t)) beginPrep();
+          else if (/\b(stop|pause)\b/.test(t)) { setRun(false); cancelPrep(); }
+          else if (/\breset\b/.test(t)) reset();
+        }
+      };
+      rec.onerror = () => { /* e.g. no-speech / not-allowed — keep quiet */ };
+      rec.onend = () => { if (wantRef.current) { try { rec.start(); } catch {} } else setListening(false); };
+      recRef.current = rec; wantRef.current = true; rec.start(); setListening(true);
+    } catch { setListening(false); }
+  };
+  useEffect(() => () => { wantRef.current = false; try { recRef.current && recRef.current.stop(); } catch {} if (prepRef.current) clearInterval(prepRef.current); }, []);
+  const inPrep = prep !== null;
+  const busy = run || inPrep;                  // lead-in or running → show full-screen focus mode
+  const frac = inPrep ? (4 - prep) / 4 : (target ? left / target : 0);   // lead-in: ring charges up 0→full
+  const display = inPrep ? prep : left;
+  const actionLabel = run ? "Pause" : inPrep ? "Ready…" : focus ? "Resume" : "Start";
+  const renderRing = (px) => {
+    const sw = px <= 100 ? 6 : 12, r = px / 2 - sw - 2, circ = 2 * Math.PI * r;
+    return (
+      <div style={{ position: "relative", width: px, height: px }}>
+        <svg width={px} height={px} style={{ transform: "rotate(-90deg)" }}>
+          <circle cx={px / 2} cy={px / 2} r={r} stroke={C.line} strokeWidth={sw} fill="none" />
+          <circle cx={px / 2} cy={px / 2} r={r} stroke={accent} strokeWidth={sw} fill="none" strokeLinecap="round"
+            strokeDasharray={circ} strokeDashoffset={circ * (1 - frac)} style={{ transition: "stroke-dashoffset 1s linear" }} />
+        </svg>
+        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Oswald, sans-serif", fontSize: px <= 100 ? 26 : Math.round(px * 0.34), color: inPrep ? accent : C.ink, animation: inPrep ? "icPrepPulse 1s ease-in-out infinite" : "none" }}>{display}</div>
+      </div>
+    );
+  };
+  const ringPx = Math.min(320, (typeof window !== "undefined" ? window.innerWidth : 380) - 72);
+  return (
+    <>
+      {/* full-screen focus mode while the timer is active — only the ring + action button, blurred backdrop */}
+      {focus && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(21,23,28,0.8)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", boxSizing: "border-box", padding: "calc(24px + env(safe-area-inset-top)) 24px calc(24px + env(safe-area-inset-bottom))" }}>
+          {renderRing(ringPx)}
+          <button onClick={onHoldTap} style={{ marginTop: 36, width: "100%", maxWidth: 300, display: "flex", alignItems: "center", justifyContent: "center", gap: 9, padding: "18px 0", borderRadius: 14, background: accent, color: "#15171C", border: "none", fontWeight: 700, fontSize: 18, cursor: "pointer", fontFamily: "Oswald, sans-serif", letterSpacing: 1, textTransform: "uppercase" }}>
+            {busy ? <Pause size={20} /> : <Play size={20} />}{actionLabel}
+          </button>
+          {!busy && (
+            <button onClick={onStop} style={{ marginTop: 12, width: "100%", maxWidth: 300, display: "flex", alignItems: "center", justifyContent: "center", gap: 9, padding: "15px 0", borderRadius: 14, background: C.bg2, color: C.ink, border: `1px solid ${C.line}`, cursor: "pointer", fontWeight: 700, fontSize: 16, fontFamily: "Oswald, sans-serif", letterSpacing: 1, textTransform: "uppercase" }}>
+              <X size={18} /> Stop
+            </button>
+          )}
+        </div>
+      )}
+    <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 14 }}>
+      {renderRing(84)}
+      <div style={{ flex: 1 }}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+          {presets.map((p) => (
+            <button key={p} onClick={() => set(p)} style={{ flex: 1, padding: "6px 0", borderRadius: 8, fontSize: 13, cursor: "pointer",
+              background: target === p ? accent : C.bg2, color: target === p ? "#15171C" : C.ink2, border: `1px solid ${C.line}`, fontWeight: 600 }}>{p}s</button>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={onHoldTap} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px 0", borderRadius: 8, cursor: "pointer", background: accent, color: "#15171C", border: "none", fontWeight: 700, fontSize: 14 }}>
+            {busy ? <Pause size={16} /> : <Play size={16} />}{actionLabel}
+          </button>
+          <button onClick={reset} aria-label="Reset timer" style={{ width: 42, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 8, cursor: "pointer", background: C.bg2, color: C.ink2, border: `1px solid ${C.line}` }}><RotateCcw size={16} /></button>
+          {SR && (
+            <button onClick={toggleVoice} aria-label={listening ? "Stop voice" : "Start by voice"} style={{ width: 42, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 8, cursor: "pointer", background: C.bg2, color: listening ? accent : C.ink2, border: `1px solid ${listening ? accent : C.line}` }}><Mic size={16} /></button>
+          )}
+        </div>
+        {SR && listening && (
+          <div style={{ fontSize: 11, color: accent, marginTop: 7, lineHeight: 1.35 }}>Listening — say "Go" to start, "Stop" to pause.</div>
+        )}
+      </div>
+    </div>
+    </>
+  );
+}
+
+/* ───────────────────────── session player ───────────────────────────────── */
+function Player({ session, onClose, onComplete, done }) {
+  const type = SCHEDULE[session - 1];
+  const ex = TYPES[type];
+  const focus = FOCUS[type];
+  const phase = phaseOf(session);
+  const [i, setI] = useState(0);
+  const e = ex[i];
+  const last = i === ex.length - 1;
+  const videoUrl = VIDEOS[e.n] || "https://www.youtube.com";
+  const touch = useRef({ x: 0, y: 0 });
+  const goPrev = () => setI((v) => Math.max(0, v - 1));
+  const goNext = () => setI((v) => Math.min(ex.length - 1, v + 1));
+  const onTouchStart = (ev) => { const t = ev.touches[0]; touch.current = { x: t.clientX, y: t.clientY }; };
+  const onTouchEnd = (ev) => {
+    const t = ev.changedTouches[0];
+    const dx = t.clientX - touch.current.x, dy = t.clientY - touch.current.y;
+    if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.4) { if (dx < 0) goNext(); else goPrev(); }
+  };
+  return (
+    <div style={{ position: "fixed", inset: 0, background: C.bg0, zIndex: 50, display: "flex", flexDirection: "column", maxWidth: 480, margin: "0 auto" }}>
+      <div style={{ padding: "calc(14px + env(safe-area-inset-top)) 18px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${C.line}` }}>
+        <div>
+          <div style={{ fontFamily: "Oswald, sans-serif", letterSpacing: 1, textTransform: "uppercase", color: focus.color, fontSize: 13 }}>Session {String(session).padStart(2, "0")} · {focus.label}</div>
+          <div style={{ fontSize: 12, color: C.ink2 }}>{phase.name} phase</div>
+        </div>
+        <button onClick={onClose} style={{ background: "none", border: "none", color: C.ink2, cursor: "pointer" }}><X size={22} /></button>
+      </div>
+
+      {/* progress dots */}
+      <div style={{ display: "flex", gap: 6, padding: "12px 18px" }}>
+        {ex.map((_, k) => (
+          <div key={k} style={{ flex: 1, height: 4, borderRadius: 2, background: k <= i ? focus.color : C.bg2 }} />
+        ))}
+      </div>
+
+      <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ flex: 1, overflowY: "auto", padding: "6px 18px 18px" }}>
+        {e.tag && <span style={{ display: "inline-block", fontSize: 11, letterSpacing: 1, textTransform: "uppercase", color: focus.color, border: `1px solid ${focus.color}`, borderRadius: 4, padding: "2px 7px", marginBottom: 10 }}>{e.tag}</span>}
+        <h2 style={{ fontFamily: "Oswald, sans-serif", fontSize: 30, color: C.ink, margin: "2px 0 4px", lineHeight: 1.05 }}>{e.n}</h2>
+        <div style={{ color: focus.color, fontWeight: 600, fontSize: 15, marginBottom: 14 }}>{e.d}</div>
+        <p style={{ color: C.ink, fontSize: 15, lineHeight: 1.55, margin: 0 }}>{e.c}</p>
+
+        <Timer accent={focus.color} />
+
+        <a href={videoUrl} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 16, padding: "11px 0", borderRadius: 9, border: `1px solid ${C.line}`, background: C.bg1, color: C.ink, textDecoration: "none", fontSize: 14, fontWeight: 600 }}>
+          <Play size={15} /> Watch a demo <ExternalLink size={13} style={{ color: C.ink2 }} />
+        </a>
+        <div style={{ fontSize: 12, color: C.ink2, textAlign: "center", marginTop: 7, lineHeight: 1.4 }}>
+          Opens a demonstration. If the form looks off, tell me and we'll swap the clip.
+        </div>
+      </div>
+
+      <div style={{ padding: "16px 16px calc(16px + env(safe-area-inset-bottom))", borderTop: `1px solid ${C.line}` }}>
+        <div style={{ textAlign: "center", fontSize: 11.5, color: C.ink2, marginBottom: 10, letterSpacing: 0.3 }}>‹ swipe to move between exercises ›</div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button disabled={i === 0} onClick={goPrev} aria-label="Previous exercise" style={{ width: 80, display: "flex", alignItems: "center", justifyContent: "center", padding: "17px 0", borderRadius: 12, background: C.bg2, color: i === 0 ? C.line : C.ink, border: `1px solid ${C.line}`, cursor: i === 0 ? "default" : "pointer" }}><ChevronLeft size={28} /></button>
+          {!last ? (
+            <button onClick={goNext} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "17px 0", borderRadius: 12, background: focus.color, color: "#15171C", border: "none", fontWeight: 700, fontSize: 17, cursor: "pointer", fontFamily: "Oswald, sans-serif", letterSpacing: 1, textTransform: "uppercase" }}>Next <ChevronRight size={24} /></button>
+          ) : (
+            <button onClick={() => { onComplete(session); onClose(); }} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 9, padding: "17px 0", borderRadius: 12, background: done ? C.bg2 : focus.color, color: done ? C.ink : "#15171C", border: done ? `1px solid ${C.line}` : "none", fontWeight: 700, fontSize: 16, cursor: "pointer", fontFamily: "Oswald, sans-serif", letterSpacing: 0.8, textTransform: "uppercase" }}>
+              <Check size={22} /> {done ? "Done — close" : "Mark done"}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ───────────────────────── tests view ───────────────────────────────────── */
+const TEST_FIELDS = [
+  { k: "squat", label: "Deep squat", hint: "heels down? chest up? note quality" },
+  { k: "n90", label: "90/90 each side", hint: "can torso stay tall? L vs R" },
+  { k: "ktw", label: "Knee-to-wall (cm)", hint: "distance toes-to-wall, each side" },
+  { k: "toe", label: "Toe-touch", hint: "fingertips: cm above (+) or below (−) floor" },
+  { k: "reach", label: "Overhead reach", hint: "arms by ears against wall? note gap" },
+];
+function Tests({ tests, setTests }) {
+  const cols = [{ key: "d1", title: "Session 01", sub: "baseline" }, { key: "d30", title: "Session 30", sub: "retest" }];
+  const upd = (col, k, v) => setTests({ ...tests, [col]: { ...(tests[col] || {}), [k]: v } });
+  return (
+    <div style={{ padding: "4px 4px 90px" }}>
+      <p style={{ color: C.ink2, fontSize: 14, lineHeight: 1.5, margin: "0 0 16px" }}>
+        Five quick self-tests. Log them on day one and again on session 30 — this is how you'll know it's working, not just how it feels.
+      </p>
+      {TEST_FIELDS.map((f) => (
+        <div key={f.k} style={{ background: C.bg1, border: `1px solid ${C.line}`, borderRadius: 12, padding: 14, marginBottom: 12 }}>
+          <div style={{ fontFamily: "Oswald, sans-serif", fontSize: 18, color: C.ink, letterSpacing: 0.4 }}>{f.label}</div>
+          <div style={{ fontSize: 12.5, color: C.ink2, marginBottom: 10 }}>{f.hint}</div>
+          <div style={{ display: "flex", gap: 10 }}>
+            {cols.map((c) => (
+              <div key={c.key} style={{ flex: 1 }}>
+                <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: C.ink2, marginBottom: 4 }}>{c.title} · {c.sub}</div>
+                <input value={(tests[c.key] || {})[f.k] || ""} onChange={(e) => upd(c.key, f.k, e.target.value)} placeholder="—"
+                  style={{ width: "100%", boxSizing: "border-box", background: C.bg2, border: `1px solid ${C.line}`, borderRadius: 8, color: C.ink, padding: "8px 10px", fontSize: 14, outline: "none" }} />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ───────────────────────── guide / notes view ───────────────────────────── */
+function Guide({ onExport, onImport }) {
+  const fileRef = useRef(null);
+  const Block = ({ color, title, children }) => (
+    <div style={{ background: C.bg1, borderLeft: `3px solid ${color}`, borderRadius: 10, padding: "13px 15px", marginBottom: 12 }}>
+      <div style={{ fontFamily: "Oswald, sans-serif", fontSize: 16, color: C.ink, letterSpacing: 0.5, marginBottom: 6, textTransform: "uppercase" }}>{title}</div>
+      <div style={{ color: C.ink2, fontSize: 13.5, lineHeight: 1.55 }}>{children}</div>
+    </div>
+  );
+  return (
+    <div style={{ padding: "4px 4px 90px" }}>
+      <Block color={C.teal} title="What actually works">
+        Frequency beats duration — short, near-daily exposure reliably grows range of motion. Your 10–15 min cap is the right dose, not a compromise. Always do the warm-up move first; it's there so you're not forcing cold end-range.
+      </Block>
+      <Block color={C.amber} title="The four phases">
+        {PHASES.map((p) => (
+          <div key={p.name} style={{ marginBottom: 7 }}>
+            <span style={{ color: p.color, fontWeight: 700 }}>{p.name}</span> <span style={{ color: C.ink2 }}>(s{p.range[0]}–{p.range[1]})</span> — {p.note}
+          </div>
+        ))}
+      </Block>
+      <Block color={C.violet} title="Your toe-touch limiter">
+        You squat fine but can't toe-touch, so the block is your posterior chain and how your spine/hips share a bend — not your hips in flexion. The banded straight-leg raise, toe-touch reset and PNF fold target exactly that. Retest the toe-touch every Sunday.
+      </Block>
+      <Block color={C.slate} title="On the demo videos">
+        I won't fake animations of human movement — wrong form taught confidently is how you get hurt. Each exercise links to live YouTube results instead. Prioritise qualified physios / S&C coaches (e.g. searches surface people like The Barbell Physio, Cleveland Clinic, physio Sam Caddick). Match the cues; bin anything that looks off.
+      </Block>
+      <Block color={C.blue} title="Honest expectation">
+        30 sessions buys a real range bump and — more importantly — an ingrained habit. It's a starting block, not a finish line. The win is that you're still doing this in month six.
+      </Block>
+
+      {/* progress backup */}
+      <div style={{ background: C.bg1, borderLeft: `3px solid ${C.amber}`, borderRadius: 10, padding: "13px 15px", marginBottom: 12 }}>
+        <div style={{ fontFamily: "Oswald, sans-serif", fontSize: 16, color: C.ink, letterSpacing: 0.5, marginBottom: 6, textTransform: "uppercase" }}>Your data</div>
+        <div style={{ color: C.ink2, fontSize: 13.5, lineHeight: 1.55, marginBottom: 12 }}>
+          Back up your progress, or move it to another device. <b style={{ color: C.ink }}>Export</b> saves a file; <b style={{ color: C.ink }}>Import</b> loads one back in (it replaces what's currently here).
+        </div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={onExport} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px 0", borderRadius: 10, background: C.amber, color: "#15171C", border: "none", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "Oswald, sans-serif", letterSpacing: 0.8, textTransform: "uppercase" }}>Export</button>
+          <button onClick={() => fileRef.current && fileRef.current.click()} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px 0", borderRadius: 10, background: C.bg2, color: C.ink, border: `1px solid ${C.line}`, fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "Oswald, sans-serif", letterSpacing: 0.8, textTransform: "uppercase" }}>Import</button>
+          <input ref={fileRef} type="file" accept="application/json,.json" style={{ display: "none" }}
+            onChange={(ev) => { const f = ev.target.files && ev.target.files[0]; if (f) onImport(f); ev.target.value = ""; }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ───────────────────────── map view ─────────────────────────────────────── */
+function PlanMap({ completed, current, onPick }) {
+  return (
+    <div style={{ padding: "4px 4px 90px" }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
+        {Object.entries(FOCUS).map(([k, f]) => (
+          <div key={k} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: C.ink2 }}>
+            <span style={{ width: 10, height: 10, borderRadius: 3, background: f.color }} /> {f.label}
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 }}>
+        {SCHEDULE.map((t, idx) => {
+          const s = idx + 1, f = FOCUS[t], isDone = completed.includes(s), isNow = s === current;
+          return (
+            <button key={s} onClick={() => onPick(s)} style={{
+              aspectRatio: "1", borderRadius: 10, cursor: "pointer", position: "relative",
+              background: isDone ? f.color : C.bg1,
+              border: isNow ? `2px solid ${f.color}` : `1px solid ${C.line}`,
+              color: isDone ? "#15171C" : C.ink, display: "flex", flexDirection: "column",
+              alignItems: "center", justifyContent: "center", gap: 2,
+            }}>
+              <span style={{ fontFamily: "Oswald, sans-serif", fontSize: 17 }}>{String(s).padStart(2, "0")}</span>
+              {isDone
+                ? <Check size={15} color="#15171C" strokeWidth={3} />
+                : <span style={{ fontSize: 9, opacity: 0.85 }}>{t}</span>}
+              {!isDone && <span style={{ position: "absolute", bottom: 5, width: 14, height: 2, borderRadius: 1, background: f.color }} />}
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ fontSize: 12, color: C.ink2, marginTop: 14, lineHeight: 1.5 }}>
+        30 sessions, done in order. At 4–5/week that's about 6 weeks; daily, about a month. Skip a day without guilt — just pick up the next session.
+      </div>
+    </div>
+  );
+}
+
+/* ───────────────────────── app shell ────────────────────────────────────── */
+function App() {
+  const [completed, setCompleted] = useState([]);
+  const [tests, setTests] = useState({});
+  const [tab, setTab] = useState("today");
+  const [player, setPlayer] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => { const s = loadState(); if (s) { setCompleted(s.completed || []); setTests(s.tests || {}); } setLoaded(true); }, []);
+  useEffect(() => { if (loaded) saveState({ completed, tests }); }, [completed, tests, loaded]);
+
+  const current = Math.min((completed.length ? Math.max(...completed) : 0) + 1, 30);
+  const nextUp = SCHEDULE.findIndex((_, i) => !completed.includes(i + 1)) + 1 || 30;
+  const complete = (s) => setCompleted((c) => (c.includes(s) ? c : [...c, s].sort((a, b) => a - b)));
+  const openSession = (s) => setPlayer(s);
+
+  // ── export / import progress ──
+  const exportData = () => {
+    try {
+      const blob = new Blob([JSON.stringify({ completed, tests }, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = "ironchin-progress.json";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) { alert("Export failed: " + err.message); }
+  };
+  const importData = (file) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const s = JSON.parse(reader.result);
+        const comp = Array.isArray(s.completed) ? s.completed.filter((n) => Number.isInteger(n) && n >= 1 && n <= 30) : [];
+        const tst = s.tests && typeof s.tests === "object" ? s.tests : {};
+        setCompleted(comp); setTests(tst);
+        saveState({ completed: comp, tests: tst });
+        alert("Progress imported.");
+      } catch (err) { alert("Import failed — that file isn't a valid Iron Chin progress file."); }
+    };
+    reader.readAsText(file);
+  };
+
+  const focus = FOCUS[SCHEDULE[nextUp - 1]];
+  const phase = phaseOf(nextUp);
+
+  const TABS = [
+    { k: "today", label: "Today", icon: Target },
+    { k: "map", label: "Plan", icon: Grid3x3 },
+    { k: "test", label: "Test", icon: ClipboardCheck },
+    { k: "guide", label: "Notes", icon: BookOpen },
+  ];
+
+  return (
+    <div style={{ background: C.bg0, minHeight: "100vh", color: C.ink, fontFamily: "Inter, system-ui, sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+        * { -webkit-tap-highlight-color: transparent; }
+        input::placeholder { color: ${C.line}; }
+        @keyframes icPrepPulse { 0%,100%{ transform: scale(1); opacity: .6; } 35%{ transform: scale(1.22); opacity: 1; } }
+        @media (prefers-reduced-motion: reduce){ *{ transition:none !important; animation:none !important; } }
+      `}</style>
+
+      <div style={{ maxWidth: 480, margin: "0 auto", padding: "env(safe-area-inset-top) 16px 0" }}>
+        {/* header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 0 14px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+            <Flame size={22} color={C.amber} />
+            <div>
+              <div style={{ fontFamily: "Oswald, sans-serif", fontWeight: 700, letterSpacing: 1.5, fontSize: 18, textTransform: "uppercase" }}>Iron Chin <span style={{ color: C.ink2, fontWeight: 500 }}>Mobility</span></div>
+              <div style={{ fontSize: 11, color: C.ink2, letterSpacing: 0.5 }}>Muay Thai range · 10–15 min</div>
+            </div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontFamily: "Oswald, sans-serif", fontSize: 22, color: C.amber, lineHeight: 1 }}>{completed.length}<span style={{ color: C.ink2, fontSize: 14 }}>/30</span></div>
+            <div style={{ fontSize: 10, color: C.ink2, textTransform: "uppercase", letterSpacing: 1 }}>forged</div>
+          </div>
+        </div>
+
+        {/* progress bar */}
+        <div style={{ height: 6, background: C.bg2, borderRadius: 3, overflow: "hidden", marginBottom: 18 }}>
+          <div style={{ height: "100%", width: `${(completed.length / 30) * 100}%`, background: `linear-gradient(90deg, ${C.amber}, ${C.violet})`, transition: "width .5s ease" }} />
+        </div>
+
+        {tab === "today" && (
+          <div style={{ paddingBottom: 90 }}>
+            <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5, color: phase.color, marginBottom: 8 }}>{phase.name} phase · session {String(nextUp).padStart(2, "0")} of 30</div>
+            <div style={{ background: C.bg1, border: `1px solid ${C.line}`, borderTop: `3px solid ${focus.color}`, borderRadius: 14, padding: 18, marginBottom: 14 }}>
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+                <h1 style={{ fontFamily: "Oswald, sans-serif", fontSize: 30, margin: 0, letterSpacing: 0.5, color: focus.color, textTransform: "uppercase" }}>{focus.label}</h1>
+                {nextUp === 1 && <span style={{ fontSize: 11, color: C.amber, border: `1px solid ${C.amber}`, borderRadius: 4, padding: "2px 7px" }}>TEST DAY</span>}
+                {nextUp === 30 && <span style={{ fontSize: 11, color: C.violet, border: `1px solid ${C.violet}`, borderRadius: 4, padding: "2px 7px" }}>RETEST</span>}
+              </div>
+              <div style={{ color: C.ink2, fontSize: 13, marginBottom: 12 }}>{focus.sub}</div>
+              <div style={{ fontSize: 12.5, color: C.ink2, lineHeight: 1.5, marginBottom: 14, paddingBottom: 14, borderBottom: `1px solid ${C.line}` }}>
+                <span style={{ color: phase.color, fontWeight: 600 }}>This phase: </span>{phase.note}
+              </div>
+              {TYPES[SCHEDULE[nextUp - 1]].map((e, k) => (
+                <div key={k} style={{ display: "flex", gap: 11, padding: "7px 0" }}>
+                  <Circle size={7} fill={focus.color} color={focus.color} style={{ marginTop: 6, flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontSize: 14.5, color: C.ink, fontWeight: 600 }}>{e.n} {e.tag && <span style={{ fontSize: 10, color: focus.color, letterSpacing: 0.5 }}>· {e.tag}</span>}</div>
+                    <div style={{ fontSize: 12.5, color: C.ink2 }}>{e.d}</div>
+                  </div>
+                </div>
+              ))}
+              <button onClick={() => openSession(nextUp)} style={{ width: "100%", marginTop: 14, padding: "13px 0", borderRadius: 11, background: focus.color, color: "#15171C", border: "none", fontWeight: 700, fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, fontFamily: "Oswald, sans-serif", letterSpacing: 1, textTransform: "uppercase" }}>
+                <Play size={18} /> {completed.includes(nextUp) ? "Repeat session" : "Start session"}
+              </button>
+            </div>
+            {completed.length === 30 && (
+              <div style={{ background: C.bg1, border: `1px solid ${C.amber}`, borderRadius: 12, padding: 16, textAlign: "center" }}>
+                <div style={{ fontFamily: "Oswald, sans-serif", fontSize: 20, color: C.amber, textTransform: "uppercase" }}>30 forged ✓</div>
+                <div style={{ fontSize: 13, color: C.ink2, marginTop: 4 }}>Log your retest, compare to day one, then keep your favourite sessions on rotation.</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab === "map" && <PlanMap completed={completed} current={nextUp} onPick={openSession} />}
+        {tab === "test" && <Tests tests={tests} setTests={setTests} />}
+        {tab === "guide" && <Guide onExport={exportData} onImport={importData} />}
+      </div>
+
+      {/* bottom nav */}
+      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: C.bg1, borderTop: `1px solid ${C.line}`, zIndex: 30, paddingBottom: "env(safe-area-inset-bottom)" }}>
+        <div style={{ maxWidth: 480, margin: "0 auto", display: "flex" }}>
+          {TABS.map((t) => {
+            const I = t.icon, on = tab === t.k;
+            return (
+              <button key={t.k} onClick={() => setTab(t.k)} style={{ flex: 1, background: "none", border: "none", padding: "10px 0 13px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, color: on ? C.amber : C.ink2 }}>
+                <I size={20} /><span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: 0.3 }}>{t.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {player && <Player session={player} done={completed.includes(player)} onClose={() => setPlayer(null)} onComplete={complete} />}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+
+  <!-- offline support: register the service worker (no-op if unsupported) -->
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("sw.js").catch(function () { /* offline still fine after first load */ });
+      });
+    }
+  </script>
+</body>
+</html>
