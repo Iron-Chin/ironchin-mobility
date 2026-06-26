@@ -393,6 +393,7 @@ const fmtDate = (d) => { try { return new Date(d).toLocaleDateString("en-GB", { 
 /* A single photo with grid overlay + 3-point angle measurement. */
 function PhotoPanel({ img, pts, date, onImg, onPts, onDate }) {
   const [grid, setGrid] = useState(false);
+  const [angleMode, setAngleMode] = useState(false);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const wrapRef = useRef(null);
   const fileRef = useRef(null);
@@ -422,7 +423,7 @@ function PhotoPanel({ img, pts, date, onImg, onPts, onDate }) {
   };
 
   const addPoint = (e) => {
-    if (!img || (pts || []).length >= 3) return;
+    if (!img || !angleMode || (pts || []).length >= 3) return;
     const el = wrapRef.current; if (!el) return;
     const rect = el.getBoundingClientRect();
     const fx = (e.clientX - rect.left) / rect.width;
@@ -490,7 +491,7 @@ function PhotoPanel({ img, pts, date, onImg, onPts, onDate }) {
             {angle}°
           </div>
         )}
-        {img && p.length > 0 && p.length < 3 && (
+        {img && angleMode && p.length < 3 && (
           <div style={{ position: "absolute", bottom: 6, left: 6, right: 6, textAlign: "center", color: C.green, fontSize: 11 }}>
             Tap to place point {p.length + 1} of 3
           </div>
@@ -505,7 +506,7 @@ function PhotoPanel({ img, pts, date, onImg, onPts, onDate }) {
 
       <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
         {btn(Grid3x3, "Toggle grid overlay", () => setGrid((g) => !g), grid)}
-        {btn(AngleIcon, "Reset angle points", () => onPts([]), false)}
+        {btn(AngleIcon, "Measure angle", () => setAngleMode((m) => { const n = !m; if (n) onPts([]); return n; }), angleMode)}
         {btn(Upload, "Upload a new photo", () => fileRef.current && fileRef.current.click(), false)}
       </div>
       <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }}
@@ -516,7 +517,7 @@ function PhotoPanel({ img, pts, date, onImg, onPts, onDate }) {
 
 function Tests({ tests, setTests }) {
   const cols = [{ key: "d1", title: "Session 01", sub: "baseline" }, { key: "d30", title: "Session 30", sub: "retest" }];
-  const upd = (col, k, v) => setTests({ ...tests, [col]: { ...(tests[col] || {}), [k]: v } });
+  const upd = (col, k, v) => setTests((prev) => ({ ...prev, [col]: { ...(prev[col] || {}), [k]: v } }));
   return (
     <div style={{ padding: "4px 4px 90px" }}>
       <p style={{ color: C.ink2, fontSize: 14, lineHeight: 1.5, margin: "0 0 16px" }}>
