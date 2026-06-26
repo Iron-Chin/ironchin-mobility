@@ -90,6 +90,7 @@ const Mic = makeIcon(<><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-
 const AngleIcon = makeIcon(<><path d="M3 20h18" /><path d="M3 20 18 5" /><path d="M11 20a8 8 0 0 0-2.3-5.7" /></>);
 const Upload = makeIcon(<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" x2="12" y1="3" y2="15" /></>);
 const Camera = makeIcon(<><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z" /><circle cx="12" cy="13" r="3" /></>);
+const Trash2 = makeIcon(<><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></>);
 
 /* ───────────────────────── palette (inline; no Tailwind arbitrary values) ── */
 const C = {
@@ -507,7 +508,7 @@ function PhotoPanel({ img, pts, date, onImg, onPts, onDate }) {
       <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
         {btn(Grid3x3, "Toggle grid overlay", () => setGrid((g) => !g), grid)}
         {btn(AngleIcon, "Measure angle", () => setAngleMode((m) => { const n = !m; if (n) onPts([]); return n; }), angleMode)}
-        {btn(Upload, "Upload a new photo", () => fileRef.current && fileRef.current.click(), false)}
+        {btn(Trash2, "Clear photo", () => { if (!img) return; if (window.confirm("Remove this photo?")) { onImg(null); onPts([]); onDate(null); setAngleMode(false); setGrid(false); } }, false)}
       </div>
       <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }}
         onChange={(ev) => { const f = ev.target.files && ev.target.files[0]; if (f) pickFile(f); ev.target.value = ""; }} />
